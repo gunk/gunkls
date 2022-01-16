@@ -93,6 +93,13 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 		}
 		l.UpdateFile(ctx, params)
 		return nil
+	case protocol.MethodTextDocumentDidClose:
+		var params protocol.DidCloseTextDocumentParams
+		if err := json.Unmarshal(r.Params(), &params); err != nil {
+			return err
+		}
+		l.CloseFile(ctx, params)
+		return nil
 
 	}
 	return nil
