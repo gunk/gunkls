@@ -4,7 +4,6 @@ import (
 	"context"
 	"go/ast"
 	"go/token"
-	"log"
 	"strings"
 
 	"github.com/gunk/gunkls/lsp/loader"
@@ -15,11 +14,9 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 	if !l.lint {
 		return nil
 	}
-	log.Println("starting linting")
 	diagnostics := make(map[string][]protocol.Diagnostic)
 	for i, f := range pkg.GunkSyntax {
 		file := pkg.GunkFiles[i]
-		log.Println("doing", file)
 		ast.Inspect(f, func(n ast.Node) bool {
 			var msg string
 			var exists bool
@@ -31,7 +28,6 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 			case *ast.File:
 				return true
 			case *ast.TypeSpec:
-				log.Println("got", v.Name.String())
 				msg, exists = checkCommentStart(n, v.Name.Name, v.Doc.Text())
 				if exists {
 					n = v.Doc.List[0]
@@ -39,7 +35,6 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 					n = v.Name
 				}
 			case *ast.Field:
-				log.Println("got", v.Type)
 				if len(v.Names) != 1 {
 					return true
 				}

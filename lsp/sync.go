@@ -75,7 +75,10 @@ func (l *LSP) doDiagnostics(ctx context.Context) {
 
 		diags, err := l.loader.Errors(l.pkgs, pkg)
 		for k, d := range l.doLinting(ctx, pkg) {
-			diags[k] = append(diags[k], d...)
+			// Don't add linting errors if there are already errors.
+			if len(diags[k]) == 0 {
+				diags[k] = append(diags[k], d...)
+			}
 		}
 
 		if err != nil {

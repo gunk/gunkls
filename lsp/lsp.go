@@ -69,7 +69,8 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 				CompletionProvider: &protocol.CompletionOptions{
 					ResolveProvider: false,
 				},
-				DefinitionProvider: true,
+				DocumentFormattingProvider: true,
+				// DefinitionProvider:         true,
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    "gls",
