@@ -16,17 +16,18 @@ import (
 	"github.com/gunk/gunk/loader"
 )
 
-// parseGunkPackage parses the package's GunkFiles, and type-checks the package
+// ParsePackage parses the package's GunkFiles, and type-checks the package
 // if l.Types is set.
-func (l *Loader) parseGunkPackage(pkg *GunkPackage) {
+func (l *Loader) ParsePackage(pkg *GunkPackage, checkTypes bool) {
 	// Clear the name before parsing to avoid Go files from triggering package
 	// name mismatch
 	pkg.Name = ""
+	l.cache[pkg.Dir] = pkg
 	var badPkgName bool
 	// parse the gunk files
 	for _, fpath := range pkg.GunkFiles {
 		var src interface{}
-		if contents, ok := l.inMemoryFiles[fpath]; ok {
+		if contents, ok := l.InMemoryFiles[fpath]; ok {
 			src = contents
 		}
 		file, err := parser.ParseFile(l.Fset, fpath, src, parser.ParseComments)
@@ -58,7 +59,7 @@ func (l *Loader) parseGunkPackage(pkg *GunkPackage) {
 		pkg.ProtoName = pkg.Name
 	}
 	// the reported error will be handled by Diagnostics
-	if len(pkg.Errors) > 0 {
+	if len(pkg.Errors) > 0 || !checkTypes {
 		return
 	}
 	pkg.Types = types.NewPackage(pkg.PkgPath, pkg.Name)

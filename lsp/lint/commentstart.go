@@ -1,4 +1,4 @@
-package lsp
+package lint
 
 import (
 	"context"
@@ -10,10 +10,7 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string][]protocol.Diagnostic {
-	if !l.lint {
-		return nil
-	}
+func commentStart(ctx context.Context, pkg *loader.GunkPackage, fset *token.FileSet) map[string][]protocol.Diagnostic {
 	diagnostics := make(map[string][]protocol.Diagnostic)
 	for i, f := range pkg.GunkSyntax {
 		file := pkg.GunkFiles[i]
@@ -23,14 +20,12 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 			switch v := n.(type) {
 			default:
 				return false
-			case *ast.GenDecl, *ast.StructType, *ast.InterfaceType, *ast.FieldList:
-				return true
-			case *ast.File:
+			case *ast.GenDecl, *ast.StructType, *ast.InterfaceType, *ast.FieldList, *ast.File:
 				return true
 			case *ast.TypeSpec:
 				msg, exists = checkCommentStart(n, v.Name.Name, v.Doc.Text())
 				if exists {
-					n = v.Doc.List[0]
+					n = toFirstWord(v.Doc.List[0])
 				} else {
 					n = v.Name
 				}
@@ -40,13 +35,13 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 				}
 				msg, exists = checkCommentStart(n, v.Names[0].Name, v.Doc.Text())
 				if exists {
-					n = v.Doc.List[0]
+					n = toFirstWord(v.Doc.List[0])
 				} else {
 					n = v.Names[0]
 				}
 			}
 			if msg != "" {
-				diagnostics[file] = append(diagnostics[file], lintWarning(file, l.loader.Fset, n, msg, "commentstart"))
+				diagnostics[file] = append(diagnostics[file], lintWarning(file, fset, n, msg, "commentstart"))
 			}
 			return true
 		})
@@ -56,7 +51,7 @@ func (l *LSP) doLinting(ctx context.Context, pkg *loader.GunkPackage) map[string
 
 // checkCommentStart checks the start of a comment for a name prefix.
 // if an issue is found, the diagnostic message is returned, and whether
-// the warning is on the comment, or the tip.
+// the warning should be on the comment, or the type.
 func checkCommentStart(n ast.Node, name string, comment string) (string, bool) {
 	prefix := name + " "
 	if strings.HasPrefix(comment, prefix) {
@@ -68,23 +63,13 @@ func checkCommentStart(n ast.Node, name string, comment string) (string, bool) {
 	return "comment should start with '" + prefix + "'", true
 }
 
-func lintWarning(file string, fset *token.FileSet, node ast.Node, msg string, code string) protocol.Diagnostic {
-	startPos := fset.Position(node.Pos())
-	endPos := fset.Position(node.End())
-	return protocol.Diagnostic{
-		Range: protocol.Range{
-			Start: protocol.Position{
-				Line:      uint32(startPos.Line) - 1,
-				Character: uint32(startPos.Column) - 1,
-			},
-			End: protocol.Position{
-				Line:      uint32(endPos.Line) - 1,
-				Character: uint32(endPos.Column) - 1,
-			},
-		},
-		Severity: 2,
-		Source:   "gunkls",
-		Message:  msg,
-		Code:     code,
+// toFirstWord modifies the ast.Comment's position so it only spans
+// to the first word.
+func toFirstWord(n *ast.Comment) ast.Node {
+	str := strings.TrimSpace(n.Text[2:])
+	missing := len(n.Text) - len(str)
+	return node{
+		pos: n.Slash,
+		end: n.Slash + token.Pos(strings.IndexRune(str, ' ')+missing),
 	}
 }
