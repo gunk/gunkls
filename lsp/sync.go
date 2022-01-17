@@ -72,7 +72,12 @@ func (l *LSP) doDiagnostics(ctx context.Context) {
 		if pkg.State != loader.Dirty {
 			continue
 		}
+
 		diags, err := l.loader.Errors(l.pkgs, pkg)
+		for k, d := range l.doLinting(ctx, pkg) {
+			diags[k] = append(diags[k], d...)
+		}
+
 		if err != nil {
 			log.Printf("could not load diagnostics: %v", err)
 		}

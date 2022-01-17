@@ -378,7 +378,7 @@ func findGunkFiles(pkg *GunkPackage) {
 }
 
 func (l *Loader) Errors(pkgs []*GunkPackage, pkg *GunkPackage) (map[string][]protocol.Diagnostic, error) {
-	// If the package is not dirty, return the cached diagnostics.
+	// If the package is not dirty, send no diagnostics.
 	if pkg.State != Dirty {
 		return nil, nil
 	}
@@ -420,7 +420,7 @@ func (l *Loader) Errors(pkgs []*GunkPackage, pkg *GunkPackage) (map[string][]pro
 			},
 			Code:     code,
 			Severity: 1,
-			Source:   "coc-gunk",
+			Source:   "gunkls",
 			Message:  pErr.Msg,
 		}
 		diagnostics[pErr.File] = append(diagnostics[pErr.File], d)

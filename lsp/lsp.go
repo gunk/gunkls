@@ -18,16 +18,25 @@ type LSP struct {
 
 	initialized bool
 	version     string
+	lint        bool
 
 	loader    *loader.Loader
 	workspace protocol.WorkspaceFolder
 	pkgs      []*loader.GunkPackage
 }
 
-func NewLSPServer(version string, conn jsonrpc2.Conn) *LSP {
+type Config struct {
+	Version string
+	Lint    bool
+
+	Conn jsonrpc2.Conn
+}
+
+func NewLSPServer(config Config) *LSP {
 	return &LSP{
-		conn:        conn,
-		initialized: false,
+		version: config.Version,
+		lint:    config.Lint,
+		conn:    config.Conn,
 	}
 }
 

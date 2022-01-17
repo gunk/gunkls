@@ -16,7 +16,10 @@ import (
 
 const version = "0.0.1"
 
-var pprofPort = flag.Int("pprof", -1, "enables pprof on the specified port")
+var (
+	pprofPort = flag.Int("pprof", -1, "enables pprof on the specified port")
+	lint      = flag.Bool("lint", false, "run linter")
+)
 
 func main() {
 	if err := run(context.Background()); err != nil {
@@ -34,12 +37,20 @@ func run(ctx context.Context) error {
 			http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", *pprofPort), nil)
 		}()
 	}
-	log.Println("gls: reading on stdin, writing on stdout")
+	log.Println("gunkls: reading on stdin, writing on stdout")
+	if *lint {
+		log.Println("gunkls: linting enabled")
+	}
 
 	stream := jsonrpc2.NewStream(stdrwc{})
 	conn := jsonrpc2.NewConn(stream)
 
-	server := jsonrpc2.HandlerServer(lsp.NewLSPServer(version, conn).Handle)
+	config := lsp.Config{
+		Lint:    *lint,
+		Version: version,
+		Conn:    conn,
+	}
+	server := jsonrpc2.HandlerServer(lsp.NewLSPServer(config).Handle)
 	return server.ServeStream(ctx, conn)
 }
 
