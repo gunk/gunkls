@@ -42,10 +42,10 @@ func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingPara
 		return
 	}
 	pkg := pkgs[0]
-	// does this file have errors, or another file?
-	if len(pkg.GunkFiles) == 0 {
+	if len(pkg.GunkSyntax) == 0 {
 		l.loader.ParsePackage(pkg, false)
 	}
+	// does this file have errors, or another file?
 	var fileErr bool
 	for _, err := range pkg.Errors {
 		if err.File == file {

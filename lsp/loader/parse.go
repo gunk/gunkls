@@ -189,7 +189,7 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 // file, adding them to pkg.GunkTags and removing the source lines from each
 // comment.
 func (l *Loader) splitGunkTags(pkg *GunkPackage, file *ast.File) {
-	hadError := false
+	// hadError := false
 	ast.Inspect(file, func(node ast.Node) bool {
 		if gd, ok := node.(*ast.GenDecl); ok {
 			if len(gd.Specs) != 1 {
@@ -206,9 +206,9 @@ func (l *Loader) splitGunkTags(pkg *GunkPackage, file *ast.File) {
 		if doc == nil {
 			return true
 		}
-		docText, exprs, err := SplitGunkTag(pkg, l.Fset, *doc)
+		_, exprs, err := SplitGunkTag(pkg, l.Fset, *doc)
 		if err != nil {
-			hadError = true
+			// hadError = true
 			pkg.addError(ValidateError, (*doc).Pos(), l.Fset, err)
 			return false
 		}
@@ -217,19 +217,19 @@ func (l *Loader) splitGunkTags(pkg *GunkPackage, file *ast.File) {
 				pkg.GunkTags = make(map[ast.Node][]loader.GunkTag)
 			}
 			pkg.GunkTags[node] = exprs
-			**doc = *CommentFromText(*doc, docText)
+			// **doc = *CommentFromText(*doc, docText)
 		}
 		return true
 	})
-	if !hadError {
-		for _, cg := range file.Comments {
-			for _, c := range cg.List {
-				if strings.Contains(c.Text, "+gunk") {
-					pkg.errorf(ParseError, c.Pos(), l.Fset, "gunk tag without declaration: %s", c.Text)
-				}
-			}
-		}
-	}
+	// if !hadError {
+	// 	for _, cg := range file.Comments {
+	// 		for _, c := range cg.List {
+	// 			if strings.Contains(Text, "+gunk") {
+	// 				pkg.errorf(ParseError, c.Pos(), l.Fset, "gunk tag without declaration: %s", c.Text)
+	// 			}
+	// 		}
+	// 	}
+	// }
 }
 
 func nodeDoc(node ast.Node) **ast.CommentGroup {
