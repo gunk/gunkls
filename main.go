@@ -9,7 +9,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/gunk/gls/lsp"
+	"github.com/gunk/gunkls/lsp"
 
 	"go.lsp.dev/jsonrpc2"
 )

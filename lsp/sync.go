@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/url"
 
-	"github.com/gunk/gls/lsp/loader"
+	"github.com/gunk/gunkls/lsp/loader"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 )

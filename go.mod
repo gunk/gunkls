@@ -1,4 +1,4 @@
-module github.com/gunk/gls
+module github.com/gunk/gunkls
 
 go 1.17
 

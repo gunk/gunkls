@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/gunk/gls/lsp/loader"
+	"github.com/gunk/gunkls/lsp/loader"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 )
@@ -57,10 +57,10 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 					OpenClose: true,
 					Change:    protocol.TextDocumentSyncKindFull,
 				},
-
 				CompletionProvider: &protocol.CompletionOptions{
-					ResolveProvider: true,
+					ResolveProvider: false,
 				},
+				DefinitionProvider: true,
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    "gls",
@@ -76,9 +76,9 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 			l.msg(ctx, protocol.MessageTypeInfo, "Loaded workspace "+l.workspace.Name)
 		}
 		return err
-
 	case protocol.MethodInitialized:
 		return nil
+	// Text Synchronization
 	case protocol.MethodTextDocumentDidOpen:
 		var params protocol.DidOpenTextDocumentParams
 		if err := json.Unmarshal(r.Params(), &params); err != nil {
@@ -100,7 +100,12 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 		}
 		l.CloseFile(ctx, params)
 		return nil
-
+	// Language Server Specific Features
+	case protocol.MethodTextDocumentDefinition:
+		var params protocol.TextDocumentPositionParams
+		if err := json.Unmarshal(r.Params(), &params); err != nil {
+			return err
+		}
 	}
 	return nil
 }
