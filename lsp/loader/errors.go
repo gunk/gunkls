@@ -57,7 +57,7 @@ func (g *GunkPackage) parseError(file string, err error) {
 				FromLine: line,
 				FromCol:  col,
 				ToLine:   line,
-				ToCol:    999,
+				ToCol:    col,
 				Msg:      scErr.Msg,
 				Kind:     ParseError,
 			})
