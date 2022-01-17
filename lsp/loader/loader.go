@@ -464,7 +464,10 @@ func (l *Loader) Import(path string) (*types.Package, error) {
 		resetPackage(pkg)
 		l.ParsePackage(pkg, true)
 	}
-	return pkgs[0].Types, nil
+	if pkg.Types == nil {
+		return nil, errors.New("package has errors")
+	}
+	return pkg.Types, nil
 }
 
 type PackageState int
@@ -508,23 +511,16 @@ func resetPackage(pkg *GunkPackage) {
 }
 
 func getNode(pos token.Pos, file *ast.File) ast.Node {
-	var candidates []ast.Node
+	var node ast.Node = file
 	ast.Inspect(file, func(n ast.Node) bool {
-		if n != nil && n.Pos() == pos {
-			candidates = append(candidates, n)
+		if n == nil || n.Pos() != pos {
+			return true
+		}
+		shorter := n.End() < node.End()
+		if shorter {
+			node = n
 		}
 		return true
 	})
-	// get shortest node that finishes
-	var shortest ast.Node
-	for _, candidate := range candidates {
-		if shortest == nil {
-			shortest = candidate
-			continue
-		}
-		if candidate.End() < shortest.End() {
-			shortest = candidate
-		}
-	}
-	return shortest
+	return node
 }
