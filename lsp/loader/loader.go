@@ -26,16 +26,16 @@ type Loader struct {
 	Types bool
 	cache map[string]*GunkPackage // map from import path to pkg
 
+	// InMemoryFiles is a list of files that are are managed by the language
+	// server, that may be in memory. This may not be synced with the contents
+	// on disk.
+	InMemoryFiles map[string]string
+
 	stack []string
 
 	// fakeFiles is a list of fake Go files added to make the Go compiler pick
 	// up gunk files in packages without Go files.
 	fakeFiles map[string][]byte
-
-	// inMemoryFiles is a list of files that are are managed by the language
-	// server, that may be in memory. This may not be synced with the contents
-	// on disk.
-	inMemoryFiles map[string]string
 }
 
 // addFakeFile adds a fake Go file to the loader, if needed.
@@ -161,10 +161,10 @@ func (l *Loader) Load(path string) ([]*GunkPackage, error) {
 // AddFile adds a gunk file to the gunk package, and removes all cached entries
 // and imports that directly or indirectly import the package of the file.
 func (l *Loader) AddFile(pkgs []*GunkPackage, path, src string) ([]*GunkPackage, *GunkPackage, error) {
-	if l.inMemoryFiles == nil {
-		l.inMemoryFiles = make(map[string]string)
+	if l.InMemoryFiles == nil {
+		l.InMemoryFiles = make(map[string]string)
 	}
-	l.inMemoryFiles[path] = src
+	l.InMemoryFiles[path] = src
 	// Find the package that contains the file.
 	var pkg *GunkPackage
 	dir := filepath.Dir(path)
@@ -261,10 +261,10 @@ func (l *Loader) AddFile(pkgs []*GunkPackage, path, src string) ([]*GunkPackage,
 }
 
 func (l *Loader) UpdateFile(pkgs []*GunkPackage, path, src string) ([]*GunkPackage, error) {
-	if l.inMemoryFiles == nil {
-		l.inMemoryFiles = make(map[string]string)
+	if l.InMemoryFiles == nil {
+		l.InMemoryFiles = make(map[string]string)
 	}
-	l.inMemoryFiles[path] = src
+	l.InMemoryFiles[path] = src
 	// Find the package that contains the file.
 	var pkg *GunkPackage
 	dir := filepath.Dir(path)
@@ -314,7 +314,7 @@ func (l *Loader) UpdateFile(pkgs []*GunkPackage, path, src string) ([]*GunkPacka
 }
 
 func (l *Loader) CloseFile(pkgs []*GunkPackage, path string) ([]*GunkPackage, error) {
-	delete(l.inMemoryFiles, path)
+	delete(l.InMemoryFiles, path)
 	// Find the package that contains the file.
 	var pkg *GunkPackage
 	var index int
@@ -385,7 +385,7 @@ func (l *Loader) Errors(pkgs []*GunkPackage, pkg *GunkPackage) (map[string][]pro
 
 	resetPackage(pkg)
 	// Populate gunk package contents
-	l.parseGunkPackage(pkg)
+	l.ParsePackage(pkg, true)
 	l.validatePackage(pkg)
 
 	diagnostics := make(map[string][]protocol.Diagnostic)
@@ -462,7 +462,7 @@ func (l *Loader) Import(path string) (*types.Package, error) {
 	}
 	if pkg.State == Dirty || pkg.Types == nil {
 		resetPackage(pkg)
-		l.parseGunkPackage(pkg)
+		l.ParsePackage(pkg, true)
 	}
 	return pkgs[0].Types, nil
 }

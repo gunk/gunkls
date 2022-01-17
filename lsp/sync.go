@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 
+	"github.com/gunk/gunkls/lsp/lint"
 	"github.com/gunk/gunkls/lsp/loader"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -74,10 +75,12 @@ func (l *LSP) doDiagnostics(ctx context.Context) {
 		}
 
 		diags, err := l.loader.Errors(l.pkgs, pkg)
-		for k, d := range l.doLinting(ctx, pkg) {
-			// Don't add linting errors if there are already errors.
-			if len(diags[k]) == 0 {
-				diags[k] = append(diags[k], d...)
+		if l.lint {
+			for k, d := range lint.LintPkg(ctx, pkg, l.loader) {
+				// Don't add linting errors if there are already errors.
+				if len(diags[k]) == 0 {
+					diags[k] = append(diags[k], d...)
+				}
 			}
 		}
 

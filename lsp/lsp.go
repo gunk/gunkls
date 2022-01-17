@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/gunk/gunk/config"
 	"github.com/gunk/gunkls/lsp/loader"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
@@ -23,6 +24,7 @@ type LSP struct {
 	loader    *loader.Loader
 	workspace protocol.WorkspaceFolder
 	pkgs      []*loader.GunkPackage
+	config    *config.Config
 }
 
 type Config struct {
@@ -109,6 +111,13 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 			return err
 		}
 		l.CloseFile(ctx, params)
+		return nil
+	case protocol.MethodTextDocumentFormatting:
+		var params protocol.DocumentFormattingParams
+		if err := json.Unmarshal(r.Params(), &params); err != nil {
+			return err
+		}
+		l.Format(ctx, params, reply)
 		return nil
 	// Language Server Specific Features
 	case protocol.MethodTextDocumentDefinition:
