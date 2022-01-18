@@ -9,7 +9,6 @@ import (
 	"go/printer"
 	"go/token"
 	"log"
-	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/gunk/gunk/config"
 	"github.com/gunk/gunkls/lsp/loader"
-	"github.com/k0kubun/pp/v3"
 	"github.com/kenshaw/snaker"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
@@ -72,7 +70,6 @@ func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingPara
 	}
 	// format file
 	fmter, err := New(config)
-	pp.Fprintln(os.Stderr, fmter)
 	if err != nil {
 		reply(ctx, nil, fmt.Errorf("could not create formatter: %v", err))
 		return
