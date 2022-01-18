@@ -222,7 +222,7 @@ func (l *Loader) AddFile(pkgs []*GunkPackage, path, src string) ([]*GunkPackage,
 		}
 		lpkgs, err := packages.Load(cfg, path)
 		if err != nil {
-			return pkgs, nil, err // errors here
+			return pkgs, nil, err
 		}
 		if len(lpkgs) != 1 {
 			return pkgs, nil, fmt.Errorf("unexpected number of packages: %d", len(lpkgs))
@@ -475,7 +475,6 @@ type PackageState int
 const (
 	Untracked PackageState = iota
 	Dirty
-	Building
 	Open
 )
 

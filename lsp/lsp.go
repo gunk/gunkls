@@ -6,7 +6,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/gunk/gunk/config"
 	"github.com/gunk/gunkls/lsp/loader"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
@@ -24,7 +23,6 @@ type LSP struct {
 	loader    *loader.Loader
 	workspace protocol.WorkspaceFolder
 	pkgs      []*loader.GunkPackage
-	config    *config.Config
 }
 
 type Config struct {
@@ -68,10 +66,10 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 					OpenClose: true,
 					Change:    protocol.TextDocumentSyncKindFull,
 				},
+				DocumentFormattingProvider: true,
 				CompletionProvider: &protocol.CompletionOptions{
 					ResolveProvider: false,
 				},
-				DocumentFormattingProvider: true,
 				// DefinitionProvider:         true,
 			},
 			ServerInfo: &protocol.ServerInfo{

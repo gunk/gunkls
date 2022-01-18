@@ -8,12 +8,18 @@ import (
 	"go/format"
 	"go/printer"
 	"go/token"
+	"log"
+	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/gunk/gunk/config"
 	"github.com/gunk/gunkls/lsp/loader"
+	"github.com/k0kubun/pp/v3"
+	"github.com/kenshaw/snaker"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 )
@@ -21,15 +27,10 @@ import (
 func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingParams, reply jsonrpc2.Replier) {
 	file := params.TextDocument.URI.Filename()
 	dir := filepath.Dir(file)
-	// if l.config == nil {
-	// 	_, err := config.Load(dir)
-	// 	if err != nil {
-	// 		l.logerr(ctx, "could not load config")
-	// 		return
-	// 	}
-	// }
-	// FIXME: use config when PR merged
-
+	config, err := config.Load(dir)
+	if err != nil {
+		log.Println(err)
+	}
 	// We should be able to assume that the file is already parsed
 	// and this is called only on open files with an up to date AST
 	pkgs, err := l.loader.Load(dir)
@@ -70,7 +71,13 @@ func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingPara
 		return
 	}
 	// format file
-	formatted, err := formatFile(l.loader.Fset, f)
+	fmter, err := New(config)
+	pp.Fprintln(os.Stderr, fmter)
+	if err != nil {
+		reply(ctx, nil, fmt.Errorf("could not create formatter: %v", err))
+		return
+	}
+	formatted, err := fmter.formatFile(l.loader.Fset, f)
 	if err != nil {
 		reply(ctx, nil, fmt.Errorf("could not format file: %v", err))
 		return
@@ -89,12 +96,33 @@ func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingPara
 					Character: 0,
 				},
 			},
-			NewText: formatted,
+			NewText: string(formatted),
 		},
 	}, nil)
 }
 
-func formatFile(fset *token.FileSet, file *ast.File) (_ string, formatErr error) {
+// Formatter is a struct that holds the state of the formatter.
+// A new formatter should be initialized when using different config.
+type Formatter struct {
+	Config *config.Config
+
+	snaker *snaker.Initialisms
+}
+
+// New creates a new instance of Formatter.
+func New(cfg *config.Config) (*Formatter, error) {
+	s := snaker.NewDefaultInitialisms()
+	err := s.Add(cfg.Format.Initialisms...)
+	if err != nil {
+		return nil, err
+	}
+	return &Formatter{
+		Config: cfg,
+		snaker: s,
+	}, nil
+}
+
+func (f *Formatter) formatFile(fset *token.FileSet, file *ast.File) (_ []byte, formatErr error) {
 	// Use custom panic values to report errors from the inspect func,
 	// since that's the easiest way to immediately halt the process and
 	// return the error.
@@ -111,11 +139,11 @@ func formatFile(fset *token.FileSet, file *ast.File) (_ string, formatErr error)
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch node := node.(type) {
 		case *ast.CommentGroup:
-			if err := formatComment(fset, node); err != nil {
+			if err := f.formatComment(fset, node); err != nil {
 				panic(inspectError{err})
 			}
 		case *ast.StructType:
-			if err := formatStruct(fset, node); err != nil {
+			if err := f.formatStruct(fset, node); err != nil {
 				panic(inspectError{err})
 			}
 		}
@@ -123,12 +151,12 @@ func formatFile(fset *token.FileSet, file *ast.File) (_ string, formatErr error)
 	})
 	var buf bytes.Buffer
 	if err := format.Node(&buf, fset, file); err != nil {
-		return "", err
+		return nil, err
 	}
-	return buf.String(), nil
+	return buf.Bytes(), nil
 }
 
-func formatComment(fset *token.FileSet, group *ast.CommentGroup) error {
+func (f *Formatter) formatComment(fset *token.FileSet, group *ast.CommentGroup) error {
 	// Split the gunk tag ourselves, so we can support Source.
 	doc, tags, err := loader.SplitGunkTag(nil, fset, group)
 	if err != nil {
@@ -160,77 +188,138 @@ func formatComment(fset *token.FileSet, group *ast.CommentGroup) error {
 	return nil
 }
 
-func formatStruct(fset *token.FileSet, st *ast.StructType) error {
+func (f *Formatter) formatStruct(fset *token.FileSet, st *ast.StructType) error {
 	if st.Fields == nil {
 		return nil
 	}
-	// Find which struct fields require sequence numbers, and
-	// keep a record of which sequence numbers are already used.
-	usedSequences := []int{}
-	fieldsWithoutSequence := []*ast.Field{}
-	for _, f := range st.Fields.List {
-		tag := f.Tag
-		if tag == nil {
-			fieldsWithoutSequence = append(fieldsWithoutSequence, f)
-			continue
+	// Figure out list of missing protobuf numbers.
+	missingNum := make([]int, 0, len(st.Fields.List))
+	if !f.Config.Format.PB { // Skip this if we are not going to use it anyways.
+		// Find all unusedFields.
+		unusedFields := make(map[int]bool, len(st.Fields.List))
+		for i := 1; i <= len(st.Fields.List); i++ {
+			unusedFields[i] = true
 		}
-		// Can skip the error here because we've already parsed the file.
-		str, _ := strconv.Unquote(tag.Value)
-		stag := reflect.StructTag(str)
-		val, ok := stag.Lookup("pb")
-		// If there isn't a 'pb' tag present.
-		if !ok {
-			fieldsWithoutSequence = append(fieldsWithoutSequence, f)
-			continue
+		for _, field := range st.Fields.List {
+			if field.Tag == nil {
+				continue
+			}
+			tag, err := strconv.Unquote(field.Tag.Value)
+			if err != nil {
+				return err
+			}
+			pb, ok := reflect.StructTag(tag).Lookup("pb")
+			if !ok {
+				continue
+			}
+			pbNum, err := strconv.Atoi(pb)
+			if err != nil {
+				errorPos := fset.Position(field.Tag.Pos())
+				// TODO: Add the same error checking in generate. Or, look at factoring
+				// this code with the code in generate, they do very similar things?
+				return fmt.Errorf("%s: struct field tag for pb contains a non-number %q", errorPos, pb)
+			}
+			delete(unusedFields, pbNum)
 		}
-		// If there was a 'pb' tag, but it wasn't empty, return an error.
-		// It is a bit difficult to add in the sequence number if the 'pb'
-		// tag already exists.
-		if ok && val == "" {
-			errorPos := fset.Position(tag.Pos())
-			return fmt.Errorf("%s: struct field tag for pb was empty, please remove or add sequence number", errorPos)
+		for k := range unusedFields {
+			missingNum = append(missingNum, k)
 		}
-		// If there isn't a number in 'pb' then return an error.
-		i, err := strconv.Atoi(val)
-		if err != nil {
-			errorPos := fset.Position(tag.Pos())
-			// TODO: Add the same error checking in generate. Or, look at factoring
-			// this code with the code in generate, they do very similar things?
-			return fmt.Errorf("%s: struct field tag for pb contains a non-number %q", errorPos, val)
-		}
-		usedSequences = append(usedSequences, i)
+		sort.Ints(missingNum)
 	}
-	// Determine missing sequences.
-	missingSequences := []int{}
-	for i := 1; i < len(st.Fields.List)+1; i++ {
-		found := false
-		for _, u := range usedSequences {
-			if u == i {
-				found = true
-				break
+	for i, field := range st.Fields.List {
+		var key []string
+		var value map[string]string
+		if field.Tag != nil {
+			tag, err := strconv.Unquote(field.Tag.Value)
+			if err != nil {
+				return err
+			}
+			key, value, err = parseTag(tag)
+			if err != nil {
+				// Don't touch tag if we can't read the tag.
+				continue
 			}
 		}
-		if !found {
-			missingSequences = append(missingSequences, i)
+		// Don't touch invalid code.
+		if len(field.Names) != 1 {
+			continue
 		}
-	}
-	// Add the sequence number to the field tag, creating a new
-	// tag if one doesn't exist, or prepend the sequence number
-	// to the tag that is already there.
-	for i, f := range fieldsWithoutSequence {
-		nextSequence := missingSequences[i]
-		if f.Tag == nil {
-			f.Tag = &ast.BasicLit{
-				ValuePos: f.Type.End() + 1,
-				Kind:     token.STRING,
-				Value:    fmt.Sprintf("`pb:\"%d\"`", nextSequence),
-			}
+		// Insert JSON and protobuf key.
+		entries := make([]string, 0, len(key))
+		if f.Config.Format.PB {
+			entries = append(entries, fmt.Sprintf("pb:%q", strconv.Itoa(i+1)))
+		} else if _, ok := value["pb"]; ok {
+			entries = append(entries, fmt.Sprintf("pb:%q", value["pb"]))
 		} else {
-			// Remove the string quoting around so it is easier to prepend
-			// the sequence number.
-			tagValueStr, _ := strconv.Unquote(f.Tag.Value)
-			f.Tag.Value = fmt.Sprintf("`pb:\"%d\" %s`", nextSequence, tagValueStr)
+			// Default behaviour: Add missing entries.
+			entries = append(entries, fmt.Sprintf("pb:%q", strconv.Itoa(missingNum[0])))
+			missingNum = missingNum[1:]
+		}
+		if f.Config.Format.JSON {
+			entries = append(entries, fmt.Sprintf("json:%q", f.snaker.CamelToSnake(field.Names[0].Name)))
+		} else if _, ok := value["json"]; ok {
+			entries = append(entries, fmt.Sprintf("json:%q", value["json"]))
+		}
+		// Maintain other keys.
+		for _, k := range key {
+			if k == "pb" || k == "json" {
+				// Skip pb and json as they have already been added to the start.
+				continue
+			}
+			entries = append(entries, fmt.Sprintf("%s:%q", k, value[k]))
+		}
+		if len(entries) > 0 {
+			field.Tag = &ast.BasicLit{
+				ValuePos: field.Type.End() + 1,
+				Kind:     token.STRING,
+				Value:    "`" + strings.Join(entries, " ") + "`",
+			}
 		}
 	}
 	return nil
+}
+
+func parseTag(tag string) ([]string, map[string]string, error) {
+	keys := make([]string, 0)
+	values := make(map[string]string)
+	for tag != "" {
+		// skip leading space
+		i := 0
+		for i < len(tag) && tag[i] == ' ' {
+			i++
+		}
+		tag = tag[i:]
+		if tag == "" {
+			break
+		}
+		// find colon separating key and value
+		for i < len(tag) && tag[i] != ':' {
+			i++
+		}
+		if i == len(tag) {
+			return nil, nil, fmt.Errorf("unterminated key")
+		}
+		key := tag[:i]
+		keys = append(keys, key)
+		tag = tag[i+1:]
+		// find end of value
+		i = 1
+		for i < len(tag) && tag[i] != '"' {
+			if tag[i] == '\\' {
+				i++
+			}
+			i++
+		}
+		if i == len(tag) {
+			return nil, nil, fmt.Errorf("unterminated value")
+		}
+		value, err := strconv.Unquote(tag[:i+1])
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid value")
+		}
+		values[key] = value
+		tag = tag[i+1:]
+	}
+
+	return keys, values, nil
 }

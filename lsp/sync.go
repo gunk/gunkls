@@ -75,17 +75,15 @@ func (l *LSP) doDiagnostics(ctx context.Context) {
 		}
 
 		diags, err := l.loader.Errors(l.pkgs, pkg)
-		if l.lint {
-			for k, d := range lint.LintPkg(ctx, pkg, l.loader) {
-				// Don't add linting errors if there are already errors.
-				if len(pkg.Errors) == 0 {
-					diags[k] = append(diags[k], d...)
-				}
-			}
-		}
-
 		if err != nil {
 			log.Printf("could not load diagnostics: %v", err)
+		}
+
+		// Don't add linting errors if there are already errors.
+		if l.lint && len(pkg.Errors) == 0 {
+			for k, d := range lint.LintPkg(ctx, pkg, l.loader) {
+				diags[k] = append(diags[k], d...)
+			}
 		}
 		// send out notifs
 		for file, d := range diags {
