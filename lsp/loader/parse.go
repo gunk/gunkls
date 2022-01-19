@@ -133,7 +133,7 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 			// Look through all fields for anonymous/unnamed types.
 			for _, field := range st.Fields.List {
 				if len(field.Names) < 1 {
-					pkg.error(path, field.Pos(), field.End(), l.Fset, "anonymous struct fields are not supported", ParseError)
+					pkg.error(path, field.Pos(), field.End(), l.Fset, "anonymous struct fields are not supported", ValidateError)
 					return false
 				}
 			}
@@ -150,7 +150,7 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 				}
 				str, _ := strconv.Unquote(f.Tag.Value)
 				if err := validateStructTag(str); err != nil {
-					pkg.error(path, tag.Pos(), tag.End(), l.Fset, err.Error(), ParseError)
+					pkg.error(path, tag.Pos(), tag.End(), l.Fset, err.Error(), ValidateError)
 					continue
 				}
 				stag := reflect.StructTag(str)
@@ -162,7 +162,7 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 				if ok && valJson != "" {
 					if jsonNamesSeen[valJson] != nil {
 						msg := fmt.Sprintf("json tag %q seen twice", valJson)
-						pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ParseError)
+						pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ValidateError)
 						continue
 					}
 					jsonNamesSeen[valJson] = tag
@@ -170,12 +170,12 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 				sequence, err := strconv.Atoi(val)
 				if err != nil {
 					msg := fmt.Sprintf("invalid sequence number %q", val)
-					pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ParseError)
+					pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ValidateError)
 					continue
 				}
 				if usedSequences[sequence] != nil {
 					msg := fmt.Sprintf("sequence number %q seen twice", val)
-					pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ParseError)
+					pkg.error(path, tag.Pos(), tag.End(), l.Fset, msg, ValidateError)
 					continue
 				}
 				usedSequences[sequence] = tag

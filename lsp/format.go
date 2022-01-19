@@ -47,7 +47,7 @@ func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingPara
 	// does this file have errors, or another file?
 	var fileErr bool
 	for _, err := range pkg.Errors {
-		if err.File == file {
+		if err.File == file && err.Kind != loader.ValidateError {
 			fileErr = true
 			break
 		}

@@ -404,7 +404,7 @@ func (l *Loader) Errors(pkgs []*GunkPackage, pkg *GunkPackage) (map[string][]pro
 		case TypeError:
 			code = "type error"
 		case ValidateError:
-			code = "validate error"
+			code = "validation error"
 		}
 
 		d := protocol.Diagnostic{
