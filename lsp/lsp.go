@@ -3,7 +3,9 @@ package lsp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"path/filepath"
 	"sync"
 
 	"github.com/gunk/gunkls/lsp/loader"
@@ -70,7 +72,7 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 				CompletionProvider: &protocol.CompletionOptions{
 					ResolveProvider: false,
 				},
-				// DefinitionProvider:         true,
+				DefinitionProvider: true,
 			},
 			ServerInfo: &protocol.ServerInfo{
 				Name:    "gls",
@@ -119,10 +121,12 @@ func (l *LSP) Handle(ctx context.Context, reply jsonrpc2.Replier, r jsonrpc2.Req
 		return nil
 	// Language Server Specific Features
 	case protocol.MethodTextDocumentDefinition:
-		var params protocol.TextDocumentPositionParams
+		var params protocol.DefinitionParams
 		if err := json.Unmarshal(r.Params(), &params); err != nil {
 			return err
 		}
+		l.Goto(ctx, params, reply)
+	default:
 	}
 	return nil
 }
@@ -146,4 +150,18 @@ func (l *LSP) msg(ctx context.Context, typ protocol.MessageType, msg string) {
 		Type:    typ,
 		Message: msg,
 	})
+}
+
+func (l *LSP) filePkg(file string) (*loader.GunkPackage, error) {
+	dir := filepath.Dir(file)
+	// We should be able to assume that the file is already parsed
+	// and this is called only on open files with an up to date AST
+	pkgs, err := l.loader.Load(dir)
+	if err != nil {
+		return nil, fmt.Errorf("could not load package: %v", err)
+	}
+	if len(pkgs) != 1 {
+		return nil, fmt.Errorf("expected 1 package, got %d", len(pkgs))
+	}
+	return pkgs[0], nil
 }

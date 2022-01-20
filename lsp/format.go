@@ -8,8 +8,6 @@ import (
 	"go/format"
 	"go/printer"
 	"go/token"
-	"log"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -24,23 +22,12 @@ import (
 
 func (l *LSP) Format(ctx context.Context, params protocol.DocumentFormattingParams, reply jsonrpc2.Replier) {
 	file := params.TextDocument.URI.Filename()
-	dir := filepath.Dir(file)
-	config, err := config.Load(dir)
+	pkg, err := l.filePkg(file)
 	if err != nil {
-		log.Println(err)
-	}
-	// We should be able to assume that the file is already parsed
-	// and this is called only on open files with an up to date AST
-	pkgs, err := l.loader.Load(dir)
-	if err != nil {
-		reply(ctx, nil, fmt.Errorf("could not load package: %v", err))
+		reply(ctx, nil, err)
 		return
 	}
-	if len(pkgs) != 1 {
-		reply(ctx, nil, fmt.Errorf("expected 1 package, got %d", len(pkgs)))
-		return
-	}
-	pkg := pkgs[0]
+	config, err := config.Load(pkg.Dir)
 	if len(pkg.GunkSyntax) == 0 {
 		l.loader.ParsePackage(pkg, false)
 	}

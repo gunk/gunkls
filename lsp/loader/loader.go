@@ -227,7 +227,7 @@ func (l *Loader) AddFile(pkgs []*GunkPackage, path, src string) ([]*GunkPackage,
 		if len(lpkgs) != 1 {
 			return pkgs, nil, fmt.Errorf("unexpected number of packages: %d", len(lpkgs))
 		}
-		pkg := NewGunkPackage(*lpkgs[0], Dirty)
+		pkg = NewGunkPackage(*lpkgs[0], Dirty)
 		findGunkFiles(pkg)
 	}
 	var exists bool

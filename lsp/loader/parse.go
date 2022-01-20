@@ -8,6 +8,8 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
+	"log"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -19,6 +21,7 @@ import (
 // ParsePackage parses the package's GunkFiles, and type-checks the package
 // if l.Types is set.
 func (l *Loader) ParsePackage(pkg *GunkPackage, checkTypes bool) {
+	log.Println("reparsing")
 	// Clear the name before parsing to avoid Go files from triggering package
 	// name mismatch
 	pkg.Name = ""
@@ -26,17 +29,23 @@ func (l *Loader) ParsePackage(pkg *GunkPackage, checkTypes bool) {
 	var badPkgName bool
 	// parse the gunk files
 	for _, fpath := range pkg.GunkFiles {
-		var src interface{}
+		var src []byte
 		if contents, ok := l.InMemoryFiles[fpath]; ok {
-			src = contents
+			src = []byte(contents)
+		} else {
+			var err error
+			src, err = os.ReadFile(fpath)
+			if err != nil {
+				continue
+			}
 		}
 		file, err := parser.ParseFile(l.Fset, fpath, src, parser.ParseComments)
 		if err != nil {
 			pkg.parseError(fpath, err)
 			continue
 		}
-		// to make the generated code independent of the current
-		// directory when running gunk
+		// to make the generated code independent of the current directory when
+		// running gunk
 		relPath := pkg.PkgPath + "/" + filepath.Base(fpath)
 		pkg.GunkNames = append(pkg.GunkNames, relPath)
 		pkg.GunkSyntax = append(pkg.GunkSyntax, file)
@@ -133,7 +142,7 @@ func (l *Loader) validatePackage(pkg *GunkPackage) {
 			// Look through all fields for anonymous/unnamed types.
 			for _, field := range st.Fields.List {
 				if len(field.Names) < 1 {
-					pkg.error(path, field.Pos(), field.End(), l.Fset, "anonymous struct fields are not supported", ValidateError)
+					pkg.error(path, field.Pos(), field.End(), l.Fset, "anonymous struct fields are not supported", TypeError)
 					return false
 				}
 			}
