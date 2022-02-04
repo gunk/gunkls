@@ -302,10 +302,6 @@ func SplitGunkTag(pkg *GunkPackage, fset *token.FileSet, comment *ast.CommentGro
 		} else if foundGunkTag {
 			gunkTagLines[len(gunkTagLines)-1] += "\n" + line
 		} else {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
 			commentLines = append(commentLines, line)
 		}
 	}
@@ -332,7 +328,8 @@ func SplitGunkTag(pkg *GunkPackage, fset *token.FileSet, comment *ast.CommentGro
 		tags = append(tags, tag)
 	}
 	// TODO: make positions in the tag expression absolute too
-	return strings.Join(commentLines, "\n"), tags, nil
+	strComment := strings.Join(commentLines, "\n")
+	return strings.TrimSpace(strComment), tags, nil
 }
 
 // ErrorAbsolutePos modifies all positions in err, considered to be relative to
