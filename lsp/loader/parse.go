@@ -8,7 +8,6 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,7 +20,6 @@ import (
 // ParsePackage parses the package's GunkFiles, and type-checks the package
 // if l.Types is set.
 func (l *Loader) ParsePackage(pkg *GunkPackage, checkTypes bool) {
-	log.Println("reparsing")
 	// Clear the name before parsing to avoid Go files from triggering package
 	// name mismatch
 	pkg.Name = ""

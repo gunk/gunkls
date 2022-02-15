@@ -390,7 +390,7 @@ func (l *Loader) Errors(pkgs []*GunkPackage, pkg *GunkPackage) (map[string][]pro
 
 	diagnostics := make(map[string][]protocol.Diagnostic)
 	for _, f := range pkg.GunkFiles {
-		diagnostics[f] = nil
+		diagnostics[f] = make([]protocol.Diagnostic, 0)
 	}
 
 	for _, pErr := range pkg.Errors {
